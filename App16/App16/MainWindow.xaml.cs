@@ -29,15 +29,17 @@ namespace App16
         public MainWindow()
         {
             this.InitializeComponent();
+            
         }
 
-        private void myButton_Click(object sender, RoutedEventArgs e)
+        private async void myButton_Click(object sender, RoutedEventArgs e)
         {
             myButton.Content = "Clicked";
 
             //Interop helpers for non-CoreWindow
             IntPtr windowHandle = (App.Current as App).WindowHandle;
-            var result = UserConsentVerifierInterop.RequestVerificationForWindowAsync((UInt64)windowHandle, "test");
+            System.Diagnostics.Debug.WriteLine("WindowId:" + windowHandle.ToString());
+            var result = await UserConsentVerifierInterop.RequestVerificationForWindowAsync(windowHandle, "test");
         }
     }
     [ComImport]
@@ -50,19 +52,20 @@ namespace App16
         void GetIids(out int iidCount, out IntPtr iids);
         void GetRuntimeClassName(out IntPtr className);
         void GetTrustLevel(out TrustLevel trustLevel);
-        IntPtr RequestVerificationForWindowAsync(UInt64 appWindow, IntPtr hstrMessage, [In] Guid riid);
+        IntPtr RequestVerificationForWindowAsync(IntPtr appWindow, IntPtr hstrMessage, [In] Guid riid, out IntPtr outPtr);
     }
 
     //Helper to initialize UserConsentVerifier
     public static class UserConsentVerifierInterop
     {
-        public static IAsyncOperation<UserConsentVerificationResult> RequestVerificationForWindowAsync(UInt64 hWnd, string Message)
+        public static IAsyncOperation<UserConsentVerificationResult> RequestVerificationForWindowAsync(IntPtr hWnd, string Message)
         {
             Guid guid = typeof(IAsyncOperation<UserConsentVerificationResult>).GUID;
 
             IUserConsentVerifierInterop userConsentVerifierInterop = UserConsentVerifier.As<IUserConsentVerifierInterop>();
             var marshalStr = MarshalString.CreateMarshaler(Message);
-            var outPtr = userConsentVerifierInterop.RequestVerificationForWindowAsync(hWnd, MarshalString.GetAbi(marshalStr), guid);
+            IntPtr outPtr;
+            var hResult = userConsentVerifierInterop.RequestVerificationForWindowAsync(hWnd, MarshalString.GetAbi(marshalStr), guid, out outPtr);
             return (IAsyncOperation<UserConsentVerificationResult>)IInspectable.FromAbi(outPtr);
         }
     }
