@@ -38,12 +38,12 @@ namespace App16
 
             //Interop helpers for non-CoreWindow
             IntPtr windowHandle = (App.Current as App).WindowHandle;
-            System.Diagnostics.Debug.WriteLine("WindowId:" + windowHandle.ToString());
             var result = await UserConsentVerifierInterop.RequestVerificationForWindowAsync(windowHandle, "test");
+
         }
     }
 
-    
+
     //MIDL_INTERFACE("39E050C3-4E74-441A-8DC0-B81104DF949C")
     //IUserConsentVerifierInterop : public IInspectable
     //{
@@ -54,7 +54,7 @@ namespace App16
     //        /* [in] */ REFIID riid,
     //        /* [iid_is][retval][out] */ void **asyncOperation) = 0;
     //};
-    
+
     [ComImport]
     [Guid("39E050C3-4E74-441A-8DC0-B81104DF949C")]
     // Note: Invoking methods on ComInterfaceType.InterfaceIsIInspectable interfaces
@@ -65,7 +65,7 @@ namespace App16
         void GetIids(out int iidCount, out IntPtr iids);
         void GetRuntimeClassName(out IntPtr className);
         void GetTrustLevel(out TrustLevel trustLevel);
-        void RequestVerificationForWindowAsync(IntPtr appWindow, IntPtr hstrMessage, [In] Guid riid, out IntPtr outPtr);
+        void RequestVerificationForWindowAsync(IntPtr appWindow, IntPtr hstrMessage, [In] ref Guid riid, out IntPtr outPtr);
     }
 
     //Helper to initialize UserConsentVerifier
@@ -73,15 +73,48 @@ namespace App16
     {
         public static IAsyncOperation<UserConsentVerificationResult> RequestVerificationForWindowAsync(IntPtr hWnd, string Message)
         {
-            Guid guid = typeof(IAsyncOperation<UserConsentVerificationResult>).GUID;
-
+            //Use WinRT's GuidGenerator to get the correct guid
+            var guid = GuidGenerator.CreateIID(typeof(IAsyncOperation<UserConsentVerificationResult>));
+            
+            //leverage winrt .As<> operator to cast winrt type to its interop interface
             IUserConsentVerifierInterop userConsentVerifierInterop = UserConsentVerifier.As<IUserConsentVerifierInterop>();
+            
+            //Handle marshalling the string to WinRT's HString
             var marshalStr = MarshalString.CreateMarshaler(Message);
             
+            //Call the Interop api that pops a dialog, passing in the hWnd parameter
             IntPtr outPtr;
-            userConsentVerifierInterop.RequestVerificationForWindowAsync(hWnd, MarshalString.GetAbi(marshalStr), guid, out outPtr);
+            userConsentVerifierInterop.RequestVerificationForWindowAsync(hWnd, MarshalString.GetAbi(marshalStr), ref guid, out outPtr);
+            
+            //Marshal the return object as an IAsyncOperation<>
             return (IAsyncOperation<UserConsentVerificationResult>)IInspectable.FromAbi(outPtr);
+
         }
     }
+
+
+    //MIDL_INTERFACE("AF86E2E0-B12D-4c6a-9C5A-D7AA65101E90")
+    //IInspectable : public IUnknown
+    //{
+    //public:
+    //    virtual HRESULT STDMETHODCALLTYPE GetIids(
+    //        /* [out] */ __RPC__out ULONG *iidCount,
+    //        /* [size_is][size_is][out] */ __RPC__deref_out_ecount_full_opt(* iidCount) IID **iids) = 0;
+    //    virtual HRESULT STDMETHODCALLTYPE GetRuntimeClassName(
+    //        /* [out] */ __RPC__deref_out_opt HSTRING *className) = 0;
+    //    virtual HRESULT STDMETHODCALLTYPE GetTrustLevel(
+    //        /* [out] */ __RPC__out TrustLevel *trustLevel) = 0;
+    //};
+
+    //[ComImport]
+    //[Guid("AF86E2E0-B12D-4c6a-9C5A-D7AA65101E90")]
+    //[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    //public interface WinRTIInspectable
+    //{
+    //    void GetIids(out int iidCount, out IntPtr iids);
+    //    void GetRuntimeClassName(out IntPtr className);
+    //    void GetTrustLevel(out TrustLevel trustLevel);
+    //}
+
 
 }
